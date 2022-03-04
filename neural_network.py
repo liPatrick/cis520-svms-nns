@@ -212,15 +212,9 @@ class NeuralNetworkClassification(NeuralNetworkBase):
                 as W1
         """
         
-        
-        
         N, d = X.shape
         m = N # i -> (1...m)
 
-
-        #|j| = self.d1, |k| = self.d
-
-                               # X is m,d1
         w1 = self.layers["W1"] # d1xd
         b1 = self.layers["b1"]
         w2 = self.layers["W2"] # 1xd1
@@ -235,21 +229,17 @@ class NeuralNetworkClassification(NeuralNetworkBase):
         #calculating gfwb
         multaWithw2 = np.matmul(w2,a)
         fwb = multaWithw2+b2 
-        gfwb = self.g(fwb) #1xm
-
+        gfwb = sigmoid(fwb) #1xm
 
         #calculating loss (1)
         loss = gfwb-y 
-
         gprimez = self.g_prime(z) #d1xm
         w2gz = w2.T * gprimez #mxd1
-
 
         #------ tot derivative w1 --------
         lossw2gz = loss*w2gz #m x d1
         w1Ds = (1.0/m) * np.matmul(lossw2gz, X)
 
-        
         #------ b1 derivatives -------
         b1Ds = (1.0/m) * np.dot(loss,w2gz.T)
 
@@ -259,73 +249,11 @@ class NeuralNetworkClassification(NeuralNetworkBase):
         #------ b2 derivatives 
         b2D = (1.0/m) * np.dot(loss, np.ones(m))
 
-
         w1_deriv = w1Ds 
         b1_deriv = b1Ds 
         w2_deriv = w2Ds 
         b2_deriv = b2D
 
-        
-        '''
-        # Your code should go here
-        N, d = X.shape
-        m = N # i -> (1...m)
-
-
-        #|j| = self.d1, |k| = self.d
-
-                               # X is m,d1
-        w1 = self.layers["W1"] # d1xd
-        b1 = self.layers["b1"]
-        w2 = self.layers["W2"] # 1xd1
-        b2 = self.layers["b2"]
-
-        #calculating z
-        wTimesx = np.matmul(w1,X.T) #d1xm
-        bExtended = np.transpose(np.tile(b1, (m,1))) #d1xm
-        z = wTimesx + bExtended 
-        a = self.g(z) #d1 x m
-
-        #calculating gfwb
-        multaWithw2 = np.matmul(w2,a)
-        fwb = multaWithw2+b2 
-        gfwb = self.g(fwb) #1xm
-
-
-        #calculating loss (1)
-        loss = np.subtract(gfwb.T, y.reshape(m,1)) #mx1
-        lossSquash = loss.sum(axis=0)
-
-        #calculate w2 element wise mult g(z) (2)
-        gprimez = self.g_prime(z) #d1xm
-        gprimzSquash = gprimez.T.sum(axis=0) #1xd1
-        w2gz = (w2 * gprimzSquash).T #d1x1
-
-        #tot derivative 
-        squashX = np.reshape(X.sum(axis=0), (1,self.d))
-        w1Ds = np.matmul(lossSquash*w2gz, squashX)/m
-        #print("w1Ds shape", w1Ds.shape)
-    
-        
-        #------ b1 derivatives -------
-        b1Ds = lossSquash*w2gz
-        #print("b1ds shape", b1Ds.shape)
-
-        #----- w2 derivatives -------
-        aSquash = np.reshape(a.T.sum(axis=0), (1,self.d1))
-        w2Ds = lossSquash*aSquash/m
-        #print("w2Ds shape", w2Ds.shape)
-
-        #------ b2 derivatives 
-        b2D = lossSquash
-        #print("b2d shape,", b2D.shape)
-
-
-        w1_deriv = w1Ds 
-        b1_deriv = b1Ds 
-        w2_deriv = w2Ds 
-        b2_deriv = b2D
-        '''
         return {
                 # the keys here are selected to match those in self.layers
                 # (initialized on line 70)
@@ -335,67 +263,6 @@ class NeuralNetworkClassification(NeuralNetworkBase):
                 "b2": b2_deriv
                 }        
 
-        """
-        #w1 derivatives
-        for j in range(len(w1Ds)):
-            for k in range(len(w1Ds[0])):
-                sum = 0
-                for i in range(m):
-                    z = np.matmul(self.layers["W1"],(X[i]))+self.layers["b1"] #this is a |j|x1 matrix
-                    a = self.applyFunctionOverRowValues(self.vectorizedg, z)
-                    f_wbx = self.layers["W2"].dot(a)+self.layers["b2"]
-                    n = self.g(f_wbx)
-
-                    sum += (n-y[i])*self.layers["W2"][0][j]*self.g_prime(z[j])*X[i][k]
-                derivative = sum/m 
-                w1Ds[j][k] = derivative
-
-        #b1 derivatives
-        for j in range(len(b1Ds)):
-            sum = 0
-            for i in range(m):
-                z = np.matmul(self.layers["W1"],(X[i]))+self.layers["b1"] #this is a |j|x1 matrix
-                a = self.applyFunctionOverRowValues(self.vectorizedg, z)
-                f_wbx = self.layers["W2"].dot(a)+self.layers["b2"]
-                n = self.g(f_wbx)
-
-                sum += (n-y[i])*self.layers["W2"][0][j]*self.g_prime(z[j])
-            derivative = sum/m 
-            b1Ds[j] = derivative
-
-
-        #w2 derivatives 
-        for j in range(len(w2Ds[0])):
-            sum = 0
-            for i in range(m):
-                z = np.matmul(self.layers["W1"],(X[i]))+self.layers["b1"] #this is a |j|x1 matrix
-                a = self.applyFunctionOverRowValues(self.vectorizedg, z)
-                f_wbx = self.layers["W2"].dot(a)+self.layers["b2"]
-                n = self.g(f_wbx)
-
-                sum += (n-y[i])*a[j]
-
-            derivative = sum/m 
-            w2Ds[0][j] = derivative
-
-        #b2 derivative 
-        sum = 0
-        for i in range(m):
-            z = np.matmul(self.layers["W1"],(X[i]))+self.layers["b1"] #this is a |j|x1 matrix
-            a = self.applyFunctionOverRowValues(self.vectorizedg, z)
-            f_wbx = self.layers["W2"].dot(a)+self.layers["b2"]
-            n = self.g(f_wbx)
-
-            sum += (n-y[i])
-
-        derivative = sum/m 
-        b2D = derivative
-
-
-
-
-
-        """
 
     
     def predict(self, X):
@@ -430,11 +297,7 @@ class NeuralNetworkClassification(NeuralNetworkBase):
         #calculating gfwb
         multaWithw2 = np.matmul(w2,a)
         fwb = multaWithw2+b2 
-        gfwb = self.g(fwb)
-        #gfwb = gfwb[0]
-        #print("gfwb shape", gfwb.shape)
-
-        
+        gfwb = sigmoid(fwb)
 
         return np.sign(gfwb-.5).reshape(-1)
 
